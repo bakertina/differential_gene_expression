@@ -1,0 +1,182 @@
+---
+title: differentially expressed gene"
+author: "Tina Baker"
+date: "12 June 2018"
+output: html_document
+---
+
+***
+# Overview
+
+A variety of methods exsist to detect differentially expressed genes. Some methods are based on non-statistical quantification of expression differences (e.g. fold-change and log-fold-change), but most methods are based on statistical tests to quantify the significance of differences in gene expression between sample group. These statistical methods can further be divided into two methodological categories: parametric tests and non-parametric tests.
+
+The t-test is a parametric test to statistically quantify the difference of sample means in cases where the assumption of homogeneity of variance (equal variances in the two populations) is violated (Boslaugh, 2013).
+
+The Wilcoxon-Mann-Whitney test is a nonparametric test to quantify the shift in empirical distribution parameters. Nonparametric tests are useful when sample populations do not meet the test assumptions of parametric tests. 
+
+https://cran.r-project.org/web/packages/myTAI/vignettes/Expression.html # edit
+
+Key features
+
+- Detection of Differentially Expressed Genes (DEGs)
+- Fold-Change
+- Wilcoxon Rank Sum Test (Mann-Whitney U test)
+- T-test
+- Upregulated and downregulated genes
+
+***
+# Install
+Prerequisites:
+
+* [Download and install Git](https://git-scm.com/downloads); for git install
+* [Download and install R](https://www.r-project.org/)
+* [Download and install Rstudio](https://www.rstudio.com/)
+
+
+You can choose from one of the following methods to install scripts and this markdown file:
+
+#### Install with Git
+Install on your computer using Git with the terminal
+
+1. [clone](https://github.com/bakertina/differential_gene_expression.git) the *differential_gene_expression* repository with Git: 
+
+        mkdir differential_gene_expression
+        git clone https://github.com/bakertina/differential_gene_expression.git differential_gene_expression
+        cd /differential_gene_expression/
+
+#### Install with ZIP
+Install on your computer by downloading the ZIP files
+
+1. [Download](tbc) and extract *differential_gene_expression*
+
+
+***
+# Start of .Rmd
+{{% alert note %}}
+Install a bunch of packages you need
+{{% /alert %}}
+
+```{r message=FALSE, warning=FALSE}
+packages <- c("tidyr","dplyr","knitr","kableExtra",
+              "broom","lazyeval", "data.table")
+if (length(setdiff(packages, rownames(installed.packages()))) > 0) {
+  install.packages(setdiff(packages, rownames(installed.packages())))
+}
+library(tidyr)
+library(dplyr)
+library(knitr)
+library(kableExtra)
+library(broom)
+library(lazyeval)
+```
+
+
+{{% alert warning %}}
+You need to change the path `mydir` to locate the differential_gene_expression folder you just made on your own machine
+{{% /alert %}}
+
+```{r}
+# ### LOAD IN THE SOURCE LOCATION
+mydir <- "/media/sf_Shared_Folder_Ubuntu/blog_post_git_repos/differential_gene_expression/"
+source(file = (paste0(mydir, "add_symb_col_id_df_obj_biomaRt.R")))
+source(file = (paste0(mydir, "t_test_wilcox_lfc.R")))
+```
+
+***
+## T-test and Wilcoxon-Mann-Whitney DGE function
+To use this function you need a log2 gene matrix with genes in columns and samples in the rows. Sample metadata also needs to be included. The number of metadata columns in not important, but all metadata columns need to be in the most left hand columns.
+
+#### example
+![](/img/example_tpm.png)
+
+Pre-processing the data 
+
+1) Gather the data using tidyr function
+2) Rename the metadata column of interest to "test_variable"
+3) Add gene symbols (optional)
+
+```{r message=FALSE, warning=FALSE}
+# ### LOAD THE DATA
+data.table::fread(paste0(mydir,"tpm_0.001_log2_meta.csv"), 
+                  stringsAsFactors = TRUE) -> all_data_meta
+all_data_meta$V1 <- NULL # remove the empty column, has out if not 
+
+# ### 1) GATHER THE DATA
+gathered <- gather(all_data_meta, key = X, 
+                   value = norm_value, starts_with("ENSG"))
+
+# ### 2) RENAME METADATA COLUMN
+gsub("outlier_class", replacement = "test_variable", 
+     x = colnames(gathered)) -> colnames(gathered)
+
+# ### 3) ADD GENE SYMBOLS
+add_symb_col_id_df_obj_biomaRt(gathered, col_id = "X") 
+gathered$symb <- symb
+```
+
+### Function variables
+`name   = ` string. set a name for the comparison
+
+`mydir  = ` string. set an output directory path for files
+
+`ttest  = ` logical. TRUE/FALSE if want t-test results
+
+`wilcox = ` logical. TRUE/FALSE if want wilcox results; NB:2 sample wilcox == Mann-Whitney
+
+`denom  = ` string. set the exact name of the **denominator**; control(NTxC)
+
+`numer  = ` string. set the exact name of the **numerator**; treatment(condition)
+
+`up_down_save = ` logical. if want the up & down files saved 
+
+`rm_below_zeros =` logical. if the mean of both conditions are below zero, remove that gene; this can remove 3-5k genes for FDR.
+
+`scrdir = ` string. (optional) set the location dir of the function **add_symb_col_id_df_obj_biomaRt.R** which adds gene symbols; remove variable if do not want gene symbols or if this is giving a error as needs internet.
+
+
+### Run main function
+
+This may take a couple of mins, please see progress bar. 
+
+```{r}
+# ### MAIN FUNCTION
+t_test_wilcox_lfc(gathered = gathered,
+                  name =  "disease_VS_normal", # set a name for the comparison
+                  mydir = mydir, # set an output directory for files
+                  ttest = FALSE, #  TRUE/FALSE
+                  wilcox = TRUE,  # TRUE/FALSE # NB: 2 sample wilcox == Mann-Whitney
+                  denom ="control", # control(NTxC)
+                  numer ="case", # treatment(condition)
+                  up_down_save = TRUE, # TRUE/FALSE if want the up&down files too
+                  rm_below_zeros = FALSE, # TRUE/FALSE # This can remove #3-5k genes
+                  scrdir = mydir) # dir add_symb_col_id_df_obj_biomaRt.R
+```
+
+## Files Returned
+
+#### Example headers
+![](/img/dge_table.jpg)
+
+The function saves a bunch of files. 
+All the files returned have the same format, most headers are self explanatory. The base means of the two groups are given. 
+- Significant = FDR(padjust) of below 0.05 and logfc of 2.
+- Significant_2 = p value of below 0.05 and logfc of 1.5. 
+
+
+The main file returned is the complete file, this contains results for all the genes
+
+- "_complete.csv"
+
+Subset on the two significant thresholds; both directions included
+
+- "_FDR_0.05_2fc.csv"
+-  "_P_0.05_1.5fc.csv"
+
+Further subset of up and down at the two significance thresholds
+
+- "_FDR_0.05_2fc_DOWN.csv"
+- "_FDR_0.05_2fc_UP.csv"
+- "_P_0.05_1.5fc_DOWN.csv"
+- "_P_0.05_1.5fc_UP.csv"
+
+

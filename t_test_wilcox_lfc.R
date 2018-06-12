@@ -20,8 +20,8 @@ t_test_wilcox_lfc <- function(gathered, mydir, name, ttest = TRUE,
   if (!length(levels(gathered$test_variable)) ==2)
     stop("Too many levels in test_variable, subset data and/or droplevels./n e.g. df")
   print(paste0("Will run; wilcox:", wilcox, "......T-test:", ttest))
-  print(paste0("Using group ", denom, " as the denominator (control)/n and group ",
-               numer, " as the numerator(treatment) e.g: ", numer,"/",denom))
+  print(paste0("Using group -> ", denom, " as the denominator (control)"))
+  print(paste0("Using group -> ", numer, " as the numerator(treatment) e.g: ", numer,"/", denom))
   if (!missing(scrdir))
     print("Will also add gene symbols to the output files")
   print(noquote(strrep("*", 81)))
